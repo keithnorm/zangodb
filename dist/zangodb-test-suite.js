@@ -4477,7 +4477,7 @@ var lookup = function lookup(next, spec) {
             cb(new Error(event.target.errorCode));
           };
           request.onsuccess = function (event) {
-            doc[spec.as] = event.target.result;
+            doc[spec.as] = [event.target.result];
             cb(null, doc, idb_cur);
           };
         } else {
@@ -4854,7 +4854,11 @@ module.exports = function (_next, spec) {
 },{"./util.js":22}],20:[function(require,module,exports){
 'use strict';
 
-function _defineProperty(obj, key, value) { if (key in obj) { Object.defineProperty(obj, key, { value: value, enumerable: true, configurable: true, writable: true }); } else { obj[key] = value; } return obj; }
+var _clone = require('clone');
+
+var _clone2 = _interopRequireDefault(_clone);
+
+function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { default: obj }; }
 
 var _require = require('./util.js'),
     toPathPieces = _require.toPathPieces,
@@ -4885,7 +4889,9 @@ module.exports = function (_next, path) {
                     for (var _iterator = new_elements[Symbol.iterator](), _step; !(_iteratorNormalCompletion = (_step = _iterator.next()).done); _iteratorNormalCompletion = true) {
                         var element = _step.value;
 
-                        elements.push(_defineProperty({}, field, element));
+                        var objClone = (0, _clone2.default)(obj);
+                        objClone[field] = element;
+                        elements.push(objClone);
                     }
                 } catch (err) {
                     _didIteratorError = true;
@@ -4927,7 +4933,7 @@ module.exports = function (_next, path) {
         return _next2(cb);
     };
 };
-},{"./util.js":22}],21:[function(require,module,exports){
+},{"./util.js":22,"clone":71}],21:[function(require,module,exports){
 'use strict';
 
 var _require = require('./util.js'),

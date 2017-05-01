@@ -15,7 +15,7 @@ var lookup = function lookup(next, spec) {
             cb(new Error(event.target.errorCode));
           };
           request.onsuccess = function (event) {
-            doc[spec.as] = event.target.result;
+            doc[spec.as] = [event.target.result];
             cb(null, doc, idb_cur);
           };
         } else {

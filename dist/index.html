@@ -1,0 +1,28 @@
+<!doctype html>
+<html>
+<head>
+  <script src='./zangodb.min.js'></script>
+  <script>
+    const db = new zango.Db('stuff', { col: ['x', 'g'], col2: [] });
+    const docs = [
+        { x: 4, k: 8, foo: [{things: 'are cool'}, {things: 'are dumb'}] },
+        { x: 2, g: 3, col2: 1},
+        { x: 3, z: 3 },
+        { x: 6, g: 9 },
+        { x: 10, k: 4 },
+        { x: 2, g: 8 },
+        { x: 2, g: 8, z: 10 },
+        { x: undefined },
+        { x: null },
+        { x: [{ k: 2 }, { k: 8 }] }
+    ];
+
+
+    db.collection('col').insert(docs);
+    db.collection('col2').insert({_id: 1, okyo: 'hey yo'});
+
+  </script>
+</head>
+<body>
+</body>
+</html
