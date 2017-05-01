@@ -44,6 +44,17 @@ class Collection {
         return cur;
     }
 
+    findOne(expr, projection_spec) {
+        const cur = new Cursor(this, 'readonly');
+
+        cur.filter(expr).limit(1);
+
+        if (projection_spec) { cur.project(projection_spec); }
+
+        return cur.toArray().then((docs) => (docs[0]));
+    }
+
+
     /**
      * Evaluate an aggregation framework pipeline.
      * @param {object[]} pipeline The pipeline.

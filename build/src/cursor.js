@@ -15,6 +15,7 @@ var createNextFn = require('./create_next_fn.js'),
     _filter = require('./filter.js'),
     _project = require('./project.js'),
     _group = require('./group.js'),
+    _lookup = require('./lookup.js'),
     _unwind = require('./unwind.js'),
     _sort = require('./sort.js'),
     _skip = require('./skip.js'),
@@ -45,7 +46,7 @@ var Cursor = function (_EventEmitter) {
     function Cursor(col, read_pref) {
         _classCallCheck(this, Cursor);
 
-        var _this = _possibleConstructorReturn(this, Object.getPrototypeOf(Cursor).call(this));
+        var _this = _possibleConstructorReturn(this, (Cursor.__proto__ || Object.getPrototypeOf(Cursor)).call(this));
 
         _this._col = col;
         _this._read_pref = read_pref;
@@ -90,7 +91,7 @@ var Cursor = function (_EventEmitter) {
     }, {
         key: 'forEach',
         value: function forEach() {
-            var fn = arguments.length <= 0 || arguments[0] === undefined ? function () {} : arguments[0];
+            var fn = arguments.length > 0 && arguments[0] !== undefined ? arguments[0] : function () {};
             var cb = arguments[1];
 
             var deferred = Q.defer();
@@ -257,6 +258,12 @@ var Cursor = function (_EventEmitter) {
         key: 'group',
         value: function group(spec) {
             return this._addStage(_group, spec);
+        }
+    }, {
+        key: 'lookup',
+        value: function lookup(spec) {
+            spec.db = this._col._db;
+            return this._addStage(_lookup, spec);
         }
 
         /**

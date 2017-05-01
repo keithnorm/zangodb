@@ -8,15 +8,15 @@ function _classCallCheck(instance, Constructor) { if (!(instance instanceof Cons
 
 var Q = require('q');
 
-var _require = require('./util.js');
-
-var getIDBError = _require.getIDBError;
-var Cursor = require('./cursor.js');
-var _aggregate = require('./aggregate.js');
-var _update = require('./update.js');
-var _remove = require('./remove.js');
+var _require = require('./util.js'),
+    getIDBError = _require.getIDBError,
+    Cursor = require('./cursor.js'),
+    _aggregate = require('./aggregate.js'),
+    _update = require('./update.js'),
+    _remove = require('./remove.js');
 
 /** Class representing a collection. */
+
 
 var Collection = function () {
     /** <strong>Note:</strong> Do not instantiate directly. */
@@ -63,6 +63,21 @@ var Collection = function () {
 
             return cur;
         }
+    }, {
+        key: 'findOne',
+        value: function findOne(expr, projection_spec) {
+            var cur = new Cursor(this, 'readonly');
+
+            cur.filter(expr).limit(1);
+
+            if (projection_spec) {
+                cur.project(projection_spec);
+            }
+
+            return cur.toArray().then(function (docs) {
+                return docs[0];
+            });
+        }
 
         /**
          * Evaluate an aggregation framework pipeline.
@@ -100,6 +115,7 @@ var Collection = function () {
                     try {
                         for (var _iterator = value[Symbol.iterator](), _step; !(_iteratorNormalCompletion = (_step = _iterator.next()).done); _iteratorNormalCompletion = true) {
                             var element = _step.value;
+
                             this._validate(element);
                         }
                     } catch (err) {
@@ -152,8 +168,10 @@ var Collection = function () {
             this._db._getConn(function (error, idb) {
                 var trans = void 0;
 
+                var name = _this._name;
+
                 try {
-                    trans = idb.transaction([_this._name], 'readwrite');
+                    trans = idb.transaction([name], 'readwrite');
                 } catch (error) {
                     return deferred.reject(error);
                 }
@@ -165,7 +183,7 @@ var Collection = function () {
                     return deferred.reject(getIDBError(e));
                 };
 
-                var store = trans.objectStore(_this._name);
+                var store = trans.objectStore(name);
 
                 var i = 0;
 

@@ -1,24 +1,21 @@
 'use strict';
 
-var _typeof = typeof Symbol === "function" && typeof Symbol.iterator === "symbol" ? function (obj) { return typeof obj; } : function (obj) { return obj && typeof Symbol === "function" && obj.constructor === Symbol && obj !== Symbol.prototype ? "symbol" : typeof obj; };
-
 var _slicedToArray = function () { function sliceIterator(arr, i) { var _arr = []; var _n = true; var _d = false; var _e = undefined; try { for (var _i = arr[Symbol.iterator](), _s; !(_n = (_s = _i.next()).done); _n = true) { _arr.push(_s.value); if (i && _arr.length === i) break; } } catch (err) { _d = true; _e = err; } finally { try { if (!_n && _i["return"]) _i["return"](); } finally { if (_d) throw _e; } } return _arr; } return function (arr, i) { if (Array.isArray(arr)) { return arr; } else if (Symbol.iterator in Object(arr)) { return sliceIterator(arr, i); } else { throw new TypeError("Invalid attempt to destructure non-iterable instance"); } }; }();
 
 var merge = require('deepmerge');
 
-var _require = require('./util.js');
+var _require = require('./util.js'),
+    hashify = _require.hashify,
+    getIDBError = _require.getIDBError,
+    filter = require('./filter.js'),
+    sort = require('./sort.js'),
+    lookup = require('./lookup.js');
 
-var hashify = _require.hashify;
-var getIDBError = _require.getIDBError;
-var filter = require('./filter.js');
-var sort = require('./sort.js');
-var _require2 = require('./lang/filter.js');
-
-var build = _require2.build;
-var Conjunction = _require2.Conjunction;
-var Disjunction = _require2.Disjunction;
-var Exists = _require2.Exists;
-
+var _require2 = require('./lang/filter.js'),
+    build = _require2.build,
+    Conjunction = _require2.Conjunction,
+    Disjunction = _require2.Disjunction,
+    Exists = _require2.Exists;
 
 var toIDBDirection = function toIDBDirection(value) {
     return value > 0 ? 'next' : 'prev';
@@ -33,15 +30,16 @@ var joinPredicates = function joinPredicates(preds) {
 };
 
 var removeClause = function removeClause(_ref) {
-    var parent = _ref.parent;
-    var index = _ref.index;
+    var parent = _ref.parent,
+        index = _ref.index;
 
     parent.args.splice(index, 1);
 };
 
 var openConn = function openConn(_ref2, cb) {
-    var col = _ref2.col;
-    var read_pref = _ref2.read_pref;
+    var col = _ref2.col,
+        read_pref = _ref2.read_pref,
+        pipeline = _ref2.pipeline;
 
     col._db._getConn(function (error, idb) {
         if (error) {
@@ -49,14 +47,43 @@ var openConn = function openConn(_ref2, cb) {
         }
 
         var name = col._name;
+        var names = [name];
+        var _iteratorNormalCompletion = true;
+        var _didIteratorError = false;
+        var _iteratorError = undefined;
 
         try {
-            var trans = idb.transaction([name], read_pref);
+            for (var _iterator = pipeline[Symbol.iterator](), _step; !(_iteratorNormalCompletion = (_step = _iterator.next()).done); _iteratorNormalCompletion = true) {
+                var _step$value = _slicedToArray(_step.value, 2),
+                    fn = _step$value[0],
+                    arg = _step$value[1];
+
+                if (fn === lookup) {
+                    names.push(arg.from);
+                }
+            }
+        } catch (err) {
+            _didIteratorError = true;
+            _iteratorError = err;
+        } finally {
+            try {
+                if (!_iteratorNormalCompletion && _iterator.return) {
+                    _iterator.return();
+                }
+            } finally {
+                if (_didIteratorError) {
+                    throw _iteratorError;
+                }
+            }
+        }
+
+        try {
+            var trans = idb.transaction(names, read_pref);
             trans.onerror = function (e) {
                 return cb(getIDBError(e));
             };
 
-            cb(null, trans.objectStore(name));
+            cb(null, trans.objectStore(name), trans);
         } catch (error) {
             cb(error);
         }
@@ -64,9 +91,9 @@ var openConn = function openConn(_ref2, cb) {
 };
 
 var getIDBReqWithIndex = function getIDBReqWithIndex(store, clause) {
-    var key_range = clause.idb_key_range || null;
-    var direction = clause.idb_direction || 'next';
-    var literal = clause.path.literal;
+    var key_range = clause.idb_key_range || null,
+        direction = clause.idb_direction || 'next',
+        literal = clause.path.literal;
 
 
     var index = void 0;
@@ -87,16 +114,15 @@ var getIDBReqWithoutIndex = function getIDBReqWithoutIndex(store) {
 var buildPredicates = function buildPredicates(pipeline) {
     var new_pipeline = [];
 
-    var _iteratorNormalCompletion = true;
-    var _didIteratorError = false;
-    var _iteratorError = undefined;
+    var _iteratorNormalCompletion2 = true;
+    var _didIteratorError2 = false;
+    var _iteratorError2 = undefined;
 
     try {
-        for (var _iterator = pipeline[Symbol.iterator](), _step; !(_iteratorNormalCompletion = (_step = _iterator.next()).done); _iteratorNormalCompletion = true) {
-            var _step$value = _slicedToArray(_step.value, 2);
-
-            var fn = _step$value[0];
-            var arg = _step$value[1];
+        for (var _iterator2 = pipeline[Symbol.iterator](), _step2; !(_iteratorNormalCompletion2 = (_step2 = _iterator2.next()).done); _iteratorNormalCompletion2 = true) {
+            var _step2$value = _slicedToArray(_step2.value, 2),
+                fn = _step2$value[0],
+                arg = _step2$value[1];
 
             if (fn === filter) {
                 var pred = build(arg);
@@ -114,16 +140,16 @@ var buildPredicates = function buildPredicates(pipeline) {
             new_pipeline.push([fn, arg]);
         }
     } catch (err) {
-        _didIteratorError = true;
-        _iteratorError = err;
+        _didIteratorError2 = true;
+        _iteratorError2 = err;
     } finally {
         try {
-            if (!_iteratorNormalCompletion && _iterator.return) {
-                _iterator.return();
+            if (!_iteratorNormalCompletion2 && _iterator2.return) {
+                _iterator2.return();
             }
         } finally {
-            if (_didIteratorError) {
-                throw _iteratorError;
+            if (_didIteratorError2) {
+                throw _iteratorError2;
             }
         }
     }
@@ -132,22 +158,22 @@ var buildPredicates = function buildPredicates(pipeline) {
 };
 
 var initPredAndSortSpec = function initPredAndSortSpec(config) {
-    var pipeline = config.pipeline;
-    var preds = [];
-    var sort_specs = [];
+    var pipeline = config.pipeline,
+        preds = [],
+        sort_specs = [];
+
 
     var i = 0;
 
-    var _iteratorNormalCompletion2 = true;
-    var _didIteratorError2 = false;
-    var _iteratorError2 = undefined;
+    var _iteratorNormalCompletion3 = true;
+    var _didIteratorError3 = false;
+    var _iteratorError3 = undefined;
 
     try {
-        for (var _iterator2 = pipeline[Symbol.iterator](), _step2; !(_iteratorNormalCompletion2 = (_step2 = _iterator2.next()).done); _iteratorNormalCompletion2 = true) {
-            var _step2$value = _slicedToArray(_step2.value, 2);
-
-            var fn = _step2$value[0];
-            var arg = _step2$value[1];
+        for (var _iterator3 = pipeline[Symbol.iterator](), _step3; !(_iteratorNormalCompletion3 = (_step3 = _iterator3.next()).done); _iteratorNormalCompletion3 = true) {
+            var _step3$value = _slicedToArray(_step3.value, 2),
+                fn = _step3$value[0],
+                arg = _step3$value[1];
 
             if (fn === sort) {
                 sort_specs.push(arg);
@@ -160,16 +186,16 @@ var initPredAndSortSpec = function initPredAndSortSpec(config) {
             i++;
         }
     } catch (err) {
-        _didIteratorError2 = true;
-        _iteratorError2 = err;
+        _didIteratorError3 = true;
+        _iteratorError3 = err;
     } finally {
         try {
-            if (!_iteratorNormalCompletion2 && _iterator2.return) {
-                _iterator2.return();
+            if (!_iteratorNormalCompletion3 && _iterator3.return) {
+                _iterator3.return();
             }
         } finally {
-            if (_didIteratorError2) {
-                throw _iteratorError2;
+            if (_didIteratorError3) {
+                throw _iteratorError3;
             }
         }
     }
@@ -191,13 +217,13 @@ var getClauses = function getClauses(col, pred) {
     var clauses = [],
         exists_clauses = [];
 
-    var _iteratorNormalCompletion3 = true;
-    var _didIteratorError3 = false;
-    var _iteratorError3 = undefined;
+    var _iteratorNormalCompletion4 = true;
+    var _didIteratorError4 = false;
+    var _iteratorError4 = undefined;
 
     try {
-        for (var _iterator3 = pred.getClauses()[Symbol.iterator](), _step3; !(_iteratorNormalCompletion3 = (_step3 = _iterator3.next()).done); _iteratorNormalCompletion3 = true) {
-            var clause = _step3.value;
+        for (var _iterator4 = pred.getClauses()[Symbol.iterator](), _step4; !(_iteratorNormalCompletion4 = (_step4 = _iterator4.next()).done); _iteratorNormalCompletion4 = true) {
+            var clause = _step4.value;
 
             if (col._isIndexed(clause.path.literal)) {
                 if (clause instanceof Exists) {
@@ -205,59 +231,6 @@ var getClauses = function getClauses(col, pred) {
                 } else {
                     clauses.push(clause);
                 }
-            }
-        }
-    } catch (err) {
-        _didIteratorError3 = true;
-        _iteratorError3 = err;
-    } finally {
-        try {
-            if (!_iteratorNormalCompletion3 && _iterator3.return) {
-                _iterator3.return();
-            }
-        } finally {
-            if (_didIteratorError3) {
-                throw _iteratorError3;
-            }
-        }
-    }
-
-    if (clauses.length) {
-        return clauses;
-    }
-
-    return exists_clauses;
-};
-
-var initClauses = function initClauses(config) {
-    var col = config.col;
-    var pred = config.pred;
-
-
-    config.clauses = getClauses(col, pred);
-};
-
-var initHint = function initHint(config) {
-    if (!config.hint) {
-        return;
-    }
-
-    var clauses = config.clauses;
-    var hint = config.hint;
-
-
-    var new_clauses = [];
-
-    var _iteratorNormalCompletion4 = true;
-    var _didIteratorError4 = false;
-    var _iteratorError4 = undefined;
-
-    try {
-        for (var _iterator4 = clauses[Symbol.iterator](), _step4; !(_iteratorNormalCompletion4 = (_step4 = _iterator4.next()).done); _iteratorNormalCompletion4 = true) {
-            var clause = _step4.value;
-
-            if (clause.path.literal === hint) {
-                new_clauses.push(clause);
             }
         }
     } catch (err) {
@@ -275,21 +248,29 @@ var initHint = function initHint(config) {
         }
     }
 
-    if (!new_clauses.length) {
-        new_clauses = [{ path: { literal: hint } }];
+    if (clauses.length) {
+        return clauses;
     }
 
-    config.clauses = new_clauses;
+    return exists_clauses;
 };
 
-var initSort = function initSort(config) {
-    if (!config.sort_spec) {
+var initClauses = function initClauses(config) {
+    var col = config.col,
+        pred = config.pred;
+
+
+    config.clauses = getClauses(col, pred);
+};
+
+var initHint = function initHint(config) {
+    if (!config.hint) {
         return;
     }
 
-    var clauses = config.clauses;
-    var spec = config.sort_spec;
-    var pipeline = config.pipeline;
+    var clauses = config.clauses,
+        hint = config.hint;
+
 
     var new_clauses = [];
 
@@ -300,16 +281,10 @@ var initSort = function initSort(config) {
     try {
         for (var _iterator5 = clauses[Symbol.iterator](), _step5; !(_iteratorNormalCompletion5 = (_step5 = _iterator5.next()).done); _iteratorNormalCompletion5 = true) {
             var clause = _step5.value;
-            var literal = clause.path.literal;
 
-            if (!spec.hasOwnProperty(literal)) {
-                continue;
+            if (clause.path.literal === hint) {
+                new_clauses.push(clause);
             }
-
-            var order = spec[literal];
-            clause.idb_direction = toIDBDirection(order);
-
-            new_clauses.push(clause);
         }
     } catch (err) {
         _didIteratorError5 = true;
@@ -326,6 +301,57 @@ var initSort = function initSort(config) {
         }
     }
 
+    if (!new_clauses.length) {
+        new_clauses = [{ path: { literal: hint } }];
+    }
+
+    config.clauses = new_clauses;
+};
+
+var initSort = function initSort(config) {
+    if (!config.sort_spec) {
+        return;
+    }
+
+    var clauses = config.clauses,
+        spec = config.sort_spec,
+        pipeline = config.pipeline;
+
+    var new_clauses = [];
+
+    var _iteratorNormalCompletion6 = true;
+    var _didIteratorError6 = false;
+    var _iteratorError6 = undefined;
+
+    try {
+        for (var _iterator6 = clauses[Symbol.iterator](), _step6; !(_iteratorNormalCompletion6 = (_step6 = _iterator6.next()).done); _iteratorNormalCompletion6 = true) {
+            var clause = _step6.value;
+            var literal = clause.path.literal;
+
+            if (!spec.hasOwnProperty(literal)) {
+                continue;
+            }
+
+            var order = spec[literal];
+            clause.idb_direction = toIDBDirection(order);
+
+            new_clauses.push(clause);
+        }
+    } catch (err) {
+        _didIteratorError6 = true;
+        _iteratorError6 = err;
+    } finally {
+        try {
+            if (!_iteratorNormalCompletion6 && _iterator6.return) {
+                _iterator6.return();
+            }
+        } finally {
+            if (_didIteratorError6) {
+                throw _iteratorError6;
+            }
+        }
+    }
+
     if (new_clauses.length) {
         config.clauses = new_clauses;
     } else {
@@ -334,30 +360,24 @@ var initSort = function initSort(config) {
 };
 
 var createGetIDBReqFn = function createGetIDBReqFn(_ref3) {
-    var pred = _ref3.pred;
-    var clauses = _ref3.clauses;
-    var pipeline = _ref3.pipeline;
+    var pred = _ref3.pred,
+        clauses = _ref3.clauses,
+        pipeline = _ref3.pipeline;
 
     var getIDBReq = void 0;
 
     if (clauses.length) {
-        var _ret = function () {
-            var clause = clauses[0];
+        var clause = clauses[0];
 
-            getIDBReq = function getIDBReq(store) {
-                return getIDBReqWithIndex(store, clause);
-            };
+        getIDBReq = function getIDBReq(store) {
+            return getIDBReqWithIndex(store, clause);
+        };
 
-            if (!pred || clause === pred) {
-                return {
-                    v: getIDBReq
-                };
-            }
+        if (!pred || clause === pred) {
+            return getIDBReq;
+        }
 
-            removeClause(clause);
-        }();
-
-        if ((typeof _ret === 'undefined' ? 'undefined' : _typeof(_ret)) === "object") return _ret.v;
+        removeClause(clause);
     } else {
         getIDBReq = getIDBReqWithoutIndex;
 
@@ -373,7 +393,8 @@ var createGetIDBReqFn = function createGetIDBReqFn(_ref3) {
 
 var createGetIDBCurFn = function createGetIDBCurFn(config) {
     var idb_cur = void 0,
-        idb_req = void 0;
+        idb_req = void 0,
+        idb_transaction = void 0;
 
     var getIDBReq = createGetIDBReqFn(config);
 
@@ -395,7 +416,8 @@ var createGetIDBCurFn = function createGetIDBCurFn(config) {
     };
 
     var _getCur = function getCur(cb) {
-        openConn(config, function (error, store) {
+        openConn(config, function (error, store, transaction) {
+            idb_transaction = transaction;
             if (error) {
                 return cb(error);
             }
@@ -414,37 +436,36 @@ var createGetIDBCurFn = function createGetIDBCurFn(config) {
 
     return function (cb) {
         return _getCur(function (error) {
-            return cb(error, idb_cur);
+            cb(error, idb_cur, idb_transaction);
         });
     };
 };
 
 var addPipelineStages = function addPipelineStages(_ref4, next) {
     var pipeline = _ref4.pipeline;
-    var _iteratorNormalCompletion6 = true;
-    var _didIteratorError6 = false;
-    var _iteratorError6 = undefined;
+    var _iteratorNormalCompletion7 = true;
+    var _didIteratorError7 = false;
+    var _iteratorError7 = undefined;
 
     try {
-        for (var _iterator6 = pipeline[Symbol.iterator](), _step6; !(_iteratorNormalCompletion6 = (_step6 = _iterator6.next()).done); _iteratorNormalCompletion6 = true) {
-            var _step6$value = _slicedToArray(_step6.value, 2);
-
-            var fn = _step6$value[0];
-            var arg = _step6$value[1];
+        for (var _iterator7 = pipeline[Symbol.iterator](), _step7; !(_iteratorNormalCompletion7 = (_step7 = _iterator7.next()).done); _iteratorNormalCompletion7 = true) {
+            var _step7$value = _slicedToArray(_step7.value, 2),
+                fn = _step7$value[0],
+                arg = _step7$value[1];
 
             next = fn(next, arg);
         }
     } catch (err) {
-        _didIteratorError6 = true;
-        _iteratorError6 = err;
+        _didIteratorError7 = true;
+        _iteratorError7 = err;
     } finally {
         try {
-            if (!_iteratorNormalCompletion6 && _iterator6.return) {
-                _iterator6.return();
+            if (!_iteratorNormalCompletion7 && _iterator7.return) {
+                _iterator7.return();
             }
         } finally {
-            if (_didIteratorError6) {
-                throw _iteratorError6;
+            if (_didIteratorError7) {
+                throw _iteratorError7;
             }
         }
     }
@@ -455,13 +476,13 @@ var addPipelineStages = function addPipelineStages(_ref4, next) {
 var createParallelNextFn = function createParallelNextFn(config) {
     var next_fns = [];
 
-    var _iteratorNormalCompletion7 = true;
-    var _didIteratorError7 = false;
-    var _iteratorError7 = undefined;
+    var _iteratorNormalCompletion8 = true;
+    var _didIteratorError8 = false;
+    var _iteratorError8 = undefined;
 
     try {
-        for (var _iterator7 = config.pred.args[Symbol.iterator](), _step7; !(_iteratorNormalCompletion7 = (_step7 = _iterator7.next()).done); _iteratorNormalCompletion7 = true) {
-            var node = _step7.value;
+        for (var _iterator8 = config.pred.args[Symbol.iterator](), _step8; !(_iteratorNormalCompletion8 = (_step8 = _iterator8.next()).done); _iteratorNormalCompletion8 = true) {
+            var node = _step8.value;
 
             var new_config = {
                 col: config.col,
@@ -477,16 +498,16 @@ var createParallelNextFn = function createParallelNextFn(config) {
             next_fns.push(addPipelineStages(new_config, _next));
         }
     } catch (err) {
-        _didIteratorError7 = true;
-        _iteratorError7 = err;
+        _didIteratorError8 = true;
+        _iteratorError8 = err;
     } finally {
         try {
-            if (!_iteratorNormalCompletion7 && _iterator7.return) {
-                _iterator7.return();
+            if (!_iteratorNormalCompletion8 && _iterator8.return) {
+                _iterator8.return();
             }
         } finally {
-            if (_didIteratorError7) {
-                throw _iteratorError7;
+            if (_didIteratorError8) {
+                throw _iteratorError8;
             }
         }
     }
@@ -541,11 +562,11 @@ var createNextFn = function createNextFn(config) {
     var getIDBCur = createGetIDBCurFn(config);
 
     var next = function next(cb) {
-        getIDBCur(function (error, idb_cur) {
+        getIDBCur(function (error, idb_cur, idb_transaction) {
             if (!idb_cur) {
                 cb(error);
             } else {
-                cb(null, idb_cur.value, idb_cur);
+                cb(null, idb_cur.value, idb_cur, idb_transaction);
             }
         });
     };

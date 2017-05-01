@@ -5,6 +5,7 @@ const createNextFn = require('./create_next_fn.js'),
       filter = require('./filter.js'),
       project = require('./project.js'),
       group = require('./group.js'),
+      lookup = require('./lookup.js'),
       unwind = require('./unwind.js'),
       sort = require('./sort.js'),
       skip = require('./skip.js'),
@@ -192,6 +193,11 @@ class Cursor extends EventEmitter {
      * });
      */
     group(spec) { return this._addStage(group, spec); }
+
+    lookup(spec) {
+      spec.db = this._col._db;
+      return this._addStage(lookup, spec);
+    }
 
     /**
      * Deconstruct an iterable and output a document for each element.
